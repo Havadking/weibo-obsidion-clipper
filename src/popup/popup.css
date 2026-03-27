@@ -1,0 +1,43 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #2b2218;
+  background:
+    radial-gradient(circle at top, rgba(255, 175, 122, 0.32), transparent 42%),
+    linear-gradient(180deg, #fffaf2 0%, #f5efe5 100%);
+}
+
+.popup {
+  width: 320px;
+  padding: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #d04d2f;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.status-text {
+  margin: 0 0 16px;
+  line-height: 1.6;
+  color: #6a5642;
+}
+
+.primary-button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 16px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #d04d2f, #f27a4a);
+  cursor: pointer;
+}

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weibo Clipper 设置</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Weibo Clipper</p>
+        <h1>把微博直接存进你的 Obsidian 库</h1>
+        <p class="summary">
+          第一次使用时先授权一个本地 Obsidian vault，然后设置微博笔记的保存路径、文件名模板和 Markdown 模板。
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>1. 选择保存方式</h2>
+            <p>Chrome/Edge 适合直接写本地目录；Brave 更适合通过 Obsidian URI 调起桌面应用来创建笔记。</p>
+          </div>
+        </div>
+        <div class="mode-grid">
+          <label class="mode-card">
+            <input id="save-method-filesystem" type="radio" name="save-method" value="filesystem" />
+            <span class="mode-title">直接写入本地目录</span>
+            <small>适合支持 File System Access API 的 Chromium 浏览器。</small>
+          </label>
+          <label class="mode-card">
+            <input id="save-method-uri" type="radio" name="save-method" value="obsidian-uri" />
+            <span class="mode-title">Obsidian URI 模式</span>
+            <small>更适合 Brave，无需目录选择器，但会通过 Obsidian 桌面应用创建笔记。</small>
+          </label>
+        </div>
+      </section>
+
+      <section id="filesystem-card" class="card">
+        <div class="section-head">
+          <div>
+            <h2>2. 本地目录模式</h2>
+            <p>这里会请求你对某个本地文件夹的读写权限。推荐直接选择 vault 根目录。</p>
+          </div>
+          <button id="pick-vault-button" class="primary-button" type="button">选择 vault 目录</button>
+        </div>
+        <dl class="status-grid">
+          <div>
+            <dt>当前 vault</dt>
+            <dd id="vault-name">未配置</dd>
+          </div>
+          <div>
+            <dt>权限状态</dt>
+            <dd id="vault-permission">未授权</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="uri-card" class="card">
+        <div class="section-head">
+          <div>
+            <h2>3. Obsidian URI 模式</h2>
+            <p>填写你的 Obsidian vault 名称。插件会生成 `obsidian://new` 链接，把微博写成对应路径的笔记。</p>
+          </div>
+        </div>
+        <label class="field">
+          <span>Vault 名称</span>
+          <input id="obsidian-vault" type="text" placeholder="例如：MyVault" />
+          <small>需要和 Obsidian 中显示的 vault 名称一致。</small>
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>4. 保存规则</h2>
+            <p>路径和文件名都支持模板变量，最终会在你选择的 vault 下创建对应目录和 Markdown 文件。</p>
+          </div>
+        </div>
+
+        <form id="config-form" class="config-form">
+          <label class="field">
+            <span>相对保存路径模板</span>
+            <input id="relative-path-template" type="text" />
+            <small>示例：<code>Clippings/Weibo/{{yyyy}}/{{mm}}</code></small>
+          </label>
+
+          <label class="field">
+            <span>文件名模板</span>
+            <input id="file-name-template" type="text" />
+            <small>示例：<code>{{yyyy}}-{{mm}}-{{dd}}-{{pathSafeAuthor}}-{{id}}</code></small>
+          </label>
+
+          <label class="field checkbox-field">
+            <input id="overwrite-existing" type="checkbox" />
+            <span>允许覆盖同名文件</span>
+          </label>
+
+          <label class="field">
+            <span>Markdown 模板</span>
+            <textarea id="note-template" rows="18"></textarea>
+          </label>
+
+          <div class="form-actions">
+            <button class="primary-button" type="submit">保存配置</button>
+            <button id="reset-button" class="secondary-button" type="button">恢复默认</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>5. 可用模板变量</h2>
+            <p>路径、文件名和笔记模板都支持这些变量。</p>
+          </div>
+        </div>
+        <div id="token-list" class="token-list"></div>
+      </section>
+
+      <p id="flash" class="flash" hidden></p>
+    </main>
+
+    <script src="../shared/core.js"></script>
+    <script src="../shared/idb.js"></script>
+    <script src="./options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+.weibo-clipper-anchor {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 9999;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  opacity: 0.38;
+  transition: opacity 0.16s ease;
+}
+
+[data-weibo-clipper-ready="true"]:hover > .weibo-clipper-anchor,
+.weibo-clipper-anchor:has(.weibo-clipper-button:focus-visible) {
+  opacity: 1;
+}
+
+.weibo-clipper-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(31, 41, 55, 0.82);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.weibo-clipper-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.weibo-clipper-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.weibo-clipper-button[data-state="saving"] {
+  color: rgba(37, 99, 235, 0.9);
+}
+
+.weibo-clipper-button[data-state="success"] {
+  color: rgba(5, 150, 105, 0.92);
+}
+
+.weibo-clipper-button[data-state="error"] {
+  color: rgba(220, 38, 38, 0.9);
+}
+
+.weibo-clipper-button:focus-visible {
+  outline: 2px solid rgba(208, 77, 47, 0.32);
+  outline-offset: 1px;
+}
+
+.weibo-clipper-button:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+
+.weibo-clipper-status {
+  max-width: 180px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1;
+  color: #4b5563;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
