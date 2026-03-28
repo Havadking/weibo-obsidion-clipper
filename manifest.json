@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Weibo Clipper for Obsidian",
-  "description": "在微博页面为每条微博增加一个保存按钮，并将内容写入本地 Obsidian 库。",
+  "name": "Social Clipper for Obsidian",
+  "description": "在微博和 X 页面为每条内容增加一个保存按钮，并将内容写入本地 Obsidian 库。",
   "version": "0.1.0",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -11,9 +11,14 @@
   "host_permissions": [
     "https://weibo.com/*",
     "https://www.weibo.com/*",
+    "https://x.com/*",
+    "https://twitter.com/*",
     "https://*.sinaimg.cn/*",
     "https://*.weibocdn.com/*",
-    "https://*.weibo.cn/*"
+    "https://*.weibo.cn/*",
+    "https://pbs.twimg.com/*",
+    "https://video.twimg.com/*",
+    "https://ton.twimg.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js"
@@ -27,7 +32,9 @@
     {
       "matches": [
         "https://weibo.com/*",
-        "https://www.weibo.com/*"
+        "https://www.weibo.com/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
       ],
       "css": [
         "src/content/content.css"

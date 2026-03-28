@@ -9,10 +9,10 @@
   <body>
     <main class="page">
       <section class="hero">
-        <p class="eyebrow">Weibo Clipper</p>
-        <h1>把微博直接存进你的 Obsidian 库</h1>
+        <p class="eyebrow">Social Clipper</p>
+        <h1>把微博和 X 直接存进你的 Obsidian 库</h1>
         <p class="summary">
-          第一次使用时先授权一个本地 Obsidian vault，然后设置微博笔记的保存路径、文件名模板和 Markdown 模板。
+          第一次使用时先授权一个本地 Obsidian vault，然后设置微博 / X 笔记的保存路径、文件名模板和 Markdown 模板。
         </p>
       </section>
 
@@ -81,9 +81,21 @@
 
         <form id="config-form" class="config-form">
           <label class="field">
-            <span>相对保存路径模板</span>
+            <span>微博保存路径模板</span>
+            <input id="relative-path-template-weibo" type="text" />
+            <small>示例：<code>00 Inbox/01 Clippings/Weibo/{{yyyy}}</code></small>
+          </label>
+
+          <label class="field">
+            <span>X 保存路径模板</span>
+            <input id="relative-path-template-x" type="text" />
+            <small>示例：<code>00 Inbox/01 Clippings/X/{{yyyy}}</code></small>
+          </label>
+
+          <label class="field">
+            <span>通用回退路径模板</span>
             <input id="relative-path-template" type="text" />
-            <small>示例：<code>Clippings/Weibo/{{yyyy}}/{{mm}}</code></small>
+            <small>当某个平台没有单独配置时，会使用这里。示例：<code>Clippings/{{sourceFolder}}/{{yyyy}}/{{mm}}</code></small>
           </label>
 
           <label class="field">

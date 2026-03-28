@@ -38,6 +38,10 @@
     saveMethodFilesystem.checked = merged.saveMethod === "filesystem";
     saveMethodUri.checked = merged.saveMethod === "obsidian-uri";
     document.getElementById("obsidian-vault").value = merged.obsidianVault || "";
+    document.getElementById("relative-path-template-weibo").value =
+      merged.pathTemplatesBySource?.weibo || "";
+    document.getElementById("relative-path-template-x").value =
+      merged.pathTemplatesBySource?.x || "";
     document.getElementById("relative-path-template").value = merged.relativePathTemplate;
     document.getElementById("file-name-template").value = merged.fileNameTemplate;
     document.getElementById("note-template").value = merged.noteTemplate;
@@ -96,6 +100,10 @@
       saveMethod: saveMethodUri.checked ? "obsidian-uri" : "filesystem",
       obsidianVault: document.getElementById("obsidian-vault").value.trim(),
       relativePathTemplate: document.getElementById("relative-path-template").value.trim(),
+      pathTemplatesBySource: {
+        weibo: document.getElementById("relative-path-template-weibo").value.trim(),
+        x: document.getElementById("relative-path-template-x").value.trim()
+      },
       fileNameTemplate: document.getElementById("file-name-template").value.trim(),
       noteTemplate: document.getElementById("note-template").value,
       overwriteExisting: document.getElementById("overwrite-existing").checked

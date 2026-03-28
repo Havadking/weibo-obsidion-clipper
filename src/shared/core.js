@@ -36,7 +36,7 @@
     "[查看原微博]({{url}})"
   ].join("\n");
 
-  const DEFAULT_NOTE_TEMPLATE = [
+  const LEGACY_DEFAULT_NOTE_TEMPLATE_V2 = [
     "---",
     "created: {{createdAtPretty}}",
     "date modified: {{modifiedAtPretty}}",
@@ -71,10 +71,54 @@
     "{{videosMarkdown}}"
   ].join("\n");
 
+  const DEFAULT_NOTE_TEMPLATE = [
+    "---",
+    "created: {{createdAtPretty}}",
+    "date modified: {{modifiedAtPretty}}",
+    "source: \"{{source}}\"",
+    "source name: \"{{sourceName}}\"",
+    "author: \"{{authorYaml}}\"",
+    "author url: \"{{authorUrlYaml}}\"",
+    "published at: \"{{publishedAtYaml}}\"",
+    "source client: \"{{sourceClientYaml}}\"",
+    "post id: \"{{idYaml}}\"",
+    "post url: \"{{urlYaml}}\"",
+    "reposts: {{repostsCount}}",
+    "comments: {{commentsCount}}",
+    "likes: {{likesCount}}",
+    "topics: {{topicsYaml}}",
+    "images: {{imagesYaml}}",
+    "videos: {{videosYaml}}",
+    "---",
+    "",
+    "# {{title}}",
+    "",
+    "{{content}}",
+    "",
+    "## 来源信息",
+    "",
+    "- 平台: {{sourceName}}",
+    "- 作者: {{author}}",
+    "- 作者主页: {{authorUrl}}",
+    "- 发布时间: {{publishedAt}}",
+    "- 来源: {{sourceClient}}",
+    "- 原文: {{url}}",
+    "- 话题: {{topicsCsv}}",
+    "",
+    "{{imagesMarkdown}}",
+    "{{videosMarkdown}}"
+  ].join("\n");
+
+  const DEFAULT_PATH_TEMPLATES_BY_SOURCE = {
+    weibo: "Clippings/Weibo/{{yyyy}}/{{mm}}",
+    x: "Clippings/X/{{yyyy}}/{{mm}}"
+  };
+
   const DEFAULT_CONFIG = {
     saveMethod: "filesystem",
     obsidianVault: "",
-    relativePathTemplate: "Clippings/Weibo/{{yyyy}}/{{mm}}",
+    relativePathTemplate: "Clippings/{{sourceFolder}}/{{yyyy}}/{{mm}}",
+    pathTemplatesBySource: DEFAULT_PATH_TEMPLATES_BY_SOURCE,
     fileNameTemplate: "{{yyyy}}-{{mm}}-{{dd}}-{{pathSafeAuthor}}-{{id}}",
     noteTemplate: DEFAULT_NOTE_TEMPLATE,
     overwriteExisting: false,
@@ -95,6 +139,9 @@
     "{{capturedAtYaml}}",
     "{{createdAtPretty}}",
     "{{modifiedAtPretty}}",
+    "{{source}}",
+    "{{sourceName}}",
+    "{{sourceFolder}}",
     "{{sourceClient}}",
     "{{sourceClientYaml}}",
     "{{url}}",
@@ -122,10 +169,15 @@
 
   function mergeConfig(rawConfig) {
     const normalizedConfig = normalizeLegacyConfig(rawConfig);
-    return {
+    const mergedConfig = {
       ...DEFAULT_CONFIG,
       ...(normalizedConfig || {})
     };
+    mergedConfig.pathTemplatesBySource = {
+      ...DEFAULT_PATH_TEMPLATES_BY_SOURCE,
+      ...(normalizedConfig?.pathTemplatesBySource || {})
+    };
+    return mergedConfig;
   }
 
   function pad(value) {
@@ -211,11 +263,42 @@
     }
 
     const normalizedConfig = { ...rawConfig };
-    if (normalizedConfig.noteTemplate === LEGACY_DEFAULT_NOTE_TEMPLATE) {
+    if (
+      normalizedConfig.noteTemplate === LEGACY_DEFAULT_NOTE_TEMPLATE ||
+      normalizedConfig.noteTemplate === LEGACY_DEFAULT_NOTE_TEMPLATE_V2
+    ) {
       normalizedConfig.noteTemplate = DEFAULT_NOTE_TEMPLATE;
     }
 
+    if (normalizedConfig.relativePathTemplate === "Clippings/Weibo/{{yyyy}}/{{mm}}") {
+      normalizedConfig.relativePathTemplate = DEFAULT_CONFIG.relativePathTemplate;
+    }
+
+    if (!normalizedConfig.pathTemplatesBySource || typeof normalizedConfig.pathTemplatesBySource !== "object") {
+      normalizedConfig.pathTemplatesBySource = derivePathTemplatesBySource(normalizedConfig);
+    }
+
     return normalizedConfig;
+  }
+
+  function derivePathTemplatesBySource(config) {
+    const relativePathTemplate = String(config?.relativePathTemplate || "").trim();
+
+    if (!relativePathTemplate || relativePathTemplate === DEFAULT_CONFIG.relativePathTemplate) {
+      return { ...DEFAULT_PATH_TEMPLATES_BY_SOURCE };
+    }
+
+    if (relativePathTemplate === "Clippings/Weibo/{{yyyy}}/{{mm}}") {
+      return {
+        weibo: "Clippings/Weibo/{{yyyy}}/{{mm}}",
+        x: DEFAULT_PATH_TEMPLATES_BY_SOURCE.x
+      };
+    }
+
+    return {
+      weibo: relativePathTemplate,
+      x: relativePathTemplate
+    };
   }
 
   function normalizeNumber(value) {
@@ -228,12 +311,24 @@
       return 0;
     }
 
+    const compactMatch = raw.match(/([\d.,]+)\s*([KMB])/i);
+    if (compactMatch) {
+      const numeric = Number.parseFloat(compactMatch[1].replace(/,/g, ""));
+      const unit = compactMatch[2].toUpperCase();
+      const multiplierMap = {
+        K: 1000,
+        M: 1000000,
+        B: 1000000000
+      };
+      return Number.isFinite(numeric) ? Math.round(numeric * multiplierMap[unit]) : 0;
+    }
+
     if (raw.includes("万")) {
       const numeric = Number.parseFloat(raw.replace("万", ""));
       return Number.isFinite(numeric) ? Math.round(numeric * 10000) : 0;
     }
 
-    const normalized = raw.replace(/[^\d.]/g, "");
+    const normalized = raw.replace(/,/g, "").replace(/[^\d.]/g, "");
     const parsed = Number.parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -256,8 +351,13 @@
     const content = String(post.content || "").trim();
     const author = String(post.author || "").trim() || "未知作者";
     const title = titleFromContent(content);
+    const source = normalizeSourceKind(post.source);
+    const sourceName = getSourceName(source);
 
     return {
+      source,
+      sourceName,
+      sourceFolder: sanitizePathSegment(sourceName, source),
       author,
       authorYaml: escapeYamlString(author),
       authorUrl: String(post.authorUrl || "").trim(),
@@ -295,6 +395,23 @@
       min: pad(now.getMinutes()),
       ss: pad(now.getSeconds())
     };
+  }
+
+  function normalizeSourceKind(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (raw === "x" || raw === "twitter") {
+      return "x";
+    }
+
+    return "weibo";
+  }
+
+  function getSourceName(source) {
+    if (source === "x") {
+      return "X";
+    }
+
+    return "Weibo";
   }
 
   function renderTemplate(template, context) {
@@ -361,8 +478,9 @@
   function createNote(post, config) {
     const merged = mergeConfig(config);
     const context = buildTemplateContext(post);
+    const pathTemplate = resolveRelativePathTemplate(merged, context.source);
     const relativePath = normalizeRelativePath(
-      renderTemplate(merged.relativePathTemplate, context)
+      renderTemplate(pathTemplate, context)
     );
     const fileName = sanitizeFileName(
       renderTemplate(merged.fileNameTemplate, context),
@@ -376,6 +494,16 @@
       fileName,
       markdown
     };
+  }
+
+  function resolveRelativePathTemplate(config, source) {
+    const normalizedSource = normalizeSourceKind(source);
+    const specificTemplate = config?.pathTemplatesBySource?.[normalizedSource];
+    if (typeof specificTemplate === "string" && specificTemplate.trim()) {
+      return specificTemplate;
+    }
+
+    return config?.relativePathTemplate || DEFAULT_CONFIG.relativePathTemplate;
   }
 
   function getNoteTargetPath(note) {
@@ -392,6 +520,8 @@
     target.createNote = createNote;
     target.getNoteTargetPath = getNoteTargetPath;
     target.formatPrettyDate = formatPrettyDate;
+    target.normalizeSourceKind = normalizeSourceKind;
+    target.resolveRelativePathTemplate = resolveRelativePathTemplate;
     target.sanitizeFileName = sanitizeFileName;
     target.sanitizePathSegment = sanitizePathSegment;
     target.normalizeNumber = normalizeNumber;

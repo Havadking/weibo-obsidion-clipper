@@ -25,7 +25,7 @@
     } else if (response.permissionState !== "granted") {
       statusText.textContent = `当前 vault：${response.vaultName}，但需要重新授权目录写入权限。`;
     } else {
-      statusText.textContent = `当前 vault：${response.vaultName}。打开微博后，每条微博右上角都会出现保存按钮。`;
+      statusText.textContent = `当前 vault：${response.vaultName}。打开微博或 X 后，每条内容右上角都会出现保存按钮。`;
     }
 
     openOptionsButton.addEventListener("click", async () => {

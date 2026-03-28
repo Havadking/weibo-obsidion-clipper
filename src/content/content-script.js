@@ -42,27 +42,67 @@
   }
 
   function scanPosts() {
+    getPostRoots().forEach((root) => enhancePost(root));
+  }
+
+  function getPostRoots() {
+    if (getCurrentSite() === "x") {
+      return getXPostRoots();
+    }
+
+    return getWeiboPostRoots();
+  }
+
+  function getCurrentSite() {
+    const hostname = location.hostname.toLowerCase();
+    if (hostname === "x.com" || hostname === "twitter.com" || hostname.endsWith(".x.com")) {
+      return "x";
+    }
+
+    return "weibo";
+  }
+
+  function getWeiboPostRoots() {
     const candidates = new Set();
 
     document
       .querySelectorAll('a[href*="/status/"], a[href*="/detail/"], a[href*="weibo.com/"][href*="/"]')
       .forEach((link) => {
-        const root = findPostRoot(link);
+        const root = findWeiboPostRoot(link);
         if (root) {
           candidates.add(root);
         }
       });
 
-    candidates.forEach((root) => enhancePost(root));
+    return Array.from(candidates);
   }
 
-  function findPostRoot(seed) {
+  function getXPostRoots() {
+    return Array.from(document.querySelectorAll("article"))
+      .filter((article) => article instanceof HTMLElement)
+      .filter((article) => {
+        const statusLink = article.querySelector('a[href*="/status/"] time');
+        if (!statusLink) {
+          return false;
+        }
+
+        const hasText = article.querySelector('[data-testid="tweetText"]');
+        const hasMedia = article.querySelector(
+          'img[src*="pbs.twimg.com/media"], img[src*="pbs.twimg.com/ext_tw_video_thumb"], video'
+        );
+        const hasAuthor = article.querySelector('[data-testid="User-Name"]');
+
+        return Boolean(hasAuthor && (hasText || hasMedia));
+      });
+  }
+
+  function findWeiboPostRoot(seed) {
     let current = seed instanceof Element ? seed : null;
     let best = null;
     let bestScore = 0;
 
     while (current && current !== document.body) {
-      const score = scorePostCandidate(current);
+      const score = scoreWeiboPostCandidate(current);
       if (score > bestScore) {
         best = current;
         bestScore = score;
@@ -74,7 +114,7 @@
     return bestScore >= 45 ? best : null;
   }
 
-  function scorePostCandidate(element) {
+  function scoreWeiboPostCandidate(element) {
     if (!(element instanceof HTMLElement)) {
       return 0;
     }
@@ -185,7 +225,7 @@
     button.disabled = true;
     button.dataset.state = "saving";
     button.innerHTML = getButtonIconMarkup();
-    updateStatus(status, "正在提取微博内容...");
+    updateStatus(status, "正在提取内容...");
 
     try {
       const post = extractPost(root);
@@ -287,23 +327,32 @@
   }
 
   function extractPost(root) {
-    const url = extractPostUrl(root);
-    const content = extractContent(root);
-    const authorLink = extractAuthorLink(root);
-    const timeLink = extractTimeLink(root);
-    const stats = extractStats(root);
+    if (getCurrentSite() === "x") {
+      return extractXPost(root);
+    }
+
+    return extractWeiboPost(root);
+  }
+
+  function extractWeiboPost(root) {
+    const url = extractWeiboPostUrl(root);
+    const content = extractWeiboContent(root);
+    const authorLink = extractWeiboAuthorLink(root);
+    const timeLink = extractWeiboTimeLink(root);
+    const stats = extractWeiboStats(root);
     const authorHref = authorLink?.getAttribute("href") || "";
 
     return {
+      source: "weibo",
       id: extractPostId(root, url),
       url,
       author: authorLink?.textContent?.trim() || "",
       authorUrl: authorHref ? new URL(authorHref, location.origin).href : "",
       publishedAt: cleanText(timeLink?.textContent || ""),
-      sourceClient: extractSourceClient(timeLink),
+      sourceClient: extractWeiboSourceClient(timeLink),
       content,
-      images: extractImages(root),
-      videos: extractVideos(root),
+      images: extractWeiboImages(root),
+      videos: extractWeiboVideos(root),
       topics: extractTopics(content),
       repostsCount: stats.repostsCount,
       commentsCount: stats.commentsCount,
@@ -311,8 +360,34 @@
     };
   }
 
-  function extractPostUrl(root) {
-    const link = extractTimeLink(root);
+  function extractXPost(root) {
+    const statusLink = extractXStatusLink(root);
+    const timeNode = statusLink?.querySelector("time");
+    const author = extractXAuthor(root);
+    const content = extractXContent(root);
+    const url = statusLink ? new URL(statusLink.getAttribute("href"), location.origin).href : location.href;
+    const stats = extractXStats(root);
+
+    return {
+      source: "x",
+      id: extractPostId(root, url),
+      url,
+      author: author.name,
+      authorUrl: author.url,
+      publishedAt: timeNode?.getAttribute("datetime") || cleanText(timeNode?.textContent || ""),
+      sourceClient: "",
+      content,
+      images: extractXImages(root),
+      videos: extractXVideos(root),
+      topics: extractTopics(content),
+      repostsCount: stats.repostsCount,
+      commentsCount: stats.commentsCount,
+      likesCount: stats.likesCount
+    };
+  }
+
+  function extractWeiboPostUrl(root) {
+    const link = extractWeiboTimeLink(root);
     const timeHref = link?.getAttribute("href") || "";
     if (link) {
       return timeHref ? new URL(timeHref, location.origin).href : location.href;
@@ -327,7 +402,16 @@
     return location.href;
   }
 
-  function extractTimeLink(root) {
+  function extractXStatusLink(root) {
+    const link = root.querySelector('a[href*="/status/"] time');
+    if (link?.parentElement instanceof HTMLAnchorElement) {
+      return link.parentElement;
+    }
+
+    return root.querySelector('a[href*="/status/"]');
+  }
+
+  function extractWeiboTimeLink(root) {
     const selectors = [
       'a[href*="/status/"]',
       'a[href*="/detail/"]',
@@ -345,7 +429,7 @@
     return null;
   }
 
-  function extractAuthorLink(root) {
+  function extractWeiboAuthorLink(root) {
     const selectors = [
       'a[href*="/u/"]',
       'a[href*="weibo.com/u/"]',
@@ -357,34 +441,40 @@
 
     for (const selector of selectors) {
       const node = root.querySelector(selector);
-      if (node && isLikelyAuthor(node)) {
+      if (node && isLikelyWeiboAuthor(node)) {
         return node;
       }
     }
 
     const links = Array.from(root.querySelectorAll("a"));
-    return links.find(isLikelyAuthor) || null;
+    return links.find(isLikelyWeiboAuthor) || null;
   }
 
-  function isLikelyAuthor(node) {
-    if (!(node instanceof HTMLAnchorElement)) {
-      return false;
+  function extractXAuthor(root) {
+    const container = root.querySelector('[data-testid="User-Name"]');
+    if (!container) {
+      return {
+        name: "",
+        url: ""
+      };
     }
 
-    const text = cleanText(node.textContent || "");
-    if (!text || text.length > 30) {
-      return false;
-    }
+    const profileLink = Array.from(container.querySelectorAll('a[href^="/"]')).find((link) =>
+      isLikelyXProfileLink(link.getAttribute("href") || "")
+    );
 
-    if (/转发|评论|赞|收藏|展开|全文|视频|图片|网页链接/.test(text)) {
-      return false;
-    }
+    const displayName =
+      Array.from(container.querySelectorAll("span"))
+        .map((node) => cleanText(node.textContent || ""))
+        .find((text) => text && !text.startsWith("@") && !isXMetaText(text)) || "";
 
-    const href = node.getAttribute("href") || "";
-    return /\/u\/|weibo\.com\/n\/|weibo\.com\/[0-9a-zA-Z_-]+/.test(href);
+    return {
+      name: displayName || (profileLink ? profileLink.pathname.split("/").filter(Boolean)[0] || "" : ""),
+      url: profileLink ? new URL(profileLink.getAttribute("href"), location.origin).href : ""
+    };
   }
 
-  function extractContent(root) {
+  function extractWeiboContent(root) {
     const selectors = [
       '[node-type="feed_list_content_full"]',
       '[node-type="feed_list_content"]',
@@ -399,7 +489,7 @@
     for (const selector of selectors) {
       root.querySelectorAll(selector).forEach((node) => {
         const text = cleanText(node.textContent || "");
-        if (text.length > bestText.length && !isUtilityText(text)) {
+        if (text.length > bestText.length && !isWeiboUtilityText(text)) {
           bestText = text;
         }
       });
@@ -417,11 +507,78 @@
     return cleanText(clone.textContent || "");
   }
 
-  function isUtilityText(text) {
+  function extractXContent(root) {
+    const textBlocks = Array.from(root.querySelectorAll('[data-testid="tweetText"]'))
+      .map((node) => cleanText(node.textContent || ""))
+      .filter(Boolean);
+
+    if (textBlocks.length > 0) {
+      return Array.from(new Set(textBlocks)).join("\n\n");
+    }
+
+    const clone = root.cloneNode(true);
+    clone.querySelectorAll("[data-weibo-clipper-anchor], button, video, img, svg").forEach((node) => {
+      node.remove();
+    });
+
+    return cleanText(clone.textContent || "");
+  }
+
+  function isLikelyWeiboAuthor(node) {
+    if (!(node instanceof HTMLAnchorElement)) {
+      return false;
+    }
+
+    const text = cleanText(node.textContent || "");
+    if (!text || text.length > 30) {
+      return false;
+    }
+
+    if (/转发|评论|赞|收藏|展开|全文|视频|图片|网页链接/.test(text)) {
+      return false;
+    }
+
+    const href = node.getAttribute("href") || "";
+    return /\/u\/|weibo\.com\/n\/|weibo\.com\/[0-9a-zA-Z_-]+/.test(href);
+  }
+
+  function isLikelyXProfileLink(href) {
+    if (!href || !href.startsWith("/")) {
+      return false;
+    }
+
+    const segments = href.split("/").filter(Boolean);
+    if (segments.length !== 1) {
+      return false;
+    }
+
+    const reserved = new Set([
+      "home",
+      "explore",
+      "notifications",
+      "messages",
+      "i",
+      "search",
+      "settings",
+      "compose",
+      "login",
+      "signup",
+      "tos",
+      "privacy"
+    ]);
+
+    return !reserved.has(segments[0].toLowerCase());
+  }
+
+  function isXMetaText(text) {
+    return /^(@|·|•)/.test(text) || /^[0-9]+[smhdw]$/.test(text.toLowerCase());
+  }
+
+  function isWeiboUtilityText(text) {
     return text.length < 5 || (/转发|评论|赞|收藏|展开全文/.test(text) && text.length < 40);
   }
 
-  function extractImages(root) {
+  function extractWeiboImages(root) {
     const urls = new Set();
     const nodes = Array.from(root.querySelectorAll("img"));
 
@@ -447,7 +604,27 @@
     return Array.from(urls);
   }
 
-  function extractVideos(root) {
+  function extractXImages(root) {
+    const urls = new Set();
+    const selectors = [
+      'img[src*="pbs.twimg.com/media"]',
+      'img[src*="pbs.twimg.com/ext_tw_video_thumb"]',
+      'img[src*="pbs.twimg.com/amplify_video_thumb"]'
+    ];
+
+    root.querySelectorAll(selectors.join(", ")).forEach((img) => {
+      const src = extractImageUrl(img);
+      if (!src) {
+        return;
+      }
+
+      urls.add(normalizeXAssetUrl(src));
+    });
+
+    return Array.from(urls);
+  }
+
+  function extractWeiboVideos(root) {
     const urls = new Set();
 
     root.querySelectorAll("video[src], video source[src]").forEach((node) => {
@@ -460,16 +637,35 @@
     return Array.from(urls);
   }
 
+  function extractXVideos(root) {
+    const urls = new Set();
+
+    root.querySelectorAll("video[src], video source[src]").forEach((node) => {
+      const src = node.getAttribute("src");
+      if (src && !src.startsWith("blob:")) {
+        urls.add(normalizeAssetUrl(src));
+      }
+    });
+
+    return Array.from(urls);
+  }
+
   function extractTopics(content) {
-    const matches = String(content || "").match(/#([^#\n]+)#/g);
+    const matches = String(content || "").match(/#([^#\n]+)#?/g);
     if (!matches) {
       return [];
     }
 
-    return Array.from(new Set(matches.map((item) => item.replaceAll("#", "").trim()).filter(Boolean)));
+    return Array.from(
+      new Set(
+        matches
+          .map((item) => item.replaceAll("#", "").trim())
+          .filter(Boolean)
+      )
+    );
   }
 
-  function extractSourceClient(timeLink) {
+  function extractWeiboSourceClient(timeLink) {
     if (!timeLink || !timeLink.parentElement) {
       return "";
     }
@@ -496,7 +692,7 @@
     }
   }
 
-  function extractStats(root) {
+  function extractWeiboStats(root) {
     const statMap = {
       repostsCount: 0,
       commentsCount: 0,
@@ -525,6 +721,40 @@
     return statMap;
   }
 
+  function extractXStats(root) {
+    return {
+      commentsCount: readXStat(root, ["reply"]),
+      repostsCount: readXStat(root, ["retweet", "unretweet"]),
+      likesCount: readXStat(root, ["like", "unlike"])
+    };
+  }
+
+  function readXStat(root, testIds) {
+    for (const testId of testIds) {
+      const node = root.querySelector(`[data-testid="${testId}"]`);
+      if (!node) {
+        continue;
+      }
+
+      const candidates = [
+        node.getAttribute("aria-label"),
+        node.getAttribute("title"),
+        node.textContent
+      ];
+
+      for (const value of candidates) {
+        const normalized = app.normalizeNumber(value);
+        if (normalized > 0) {
+          return normalized;
+        }
+      }
+
+      return 0;
+    }
+
+    return 0;
+  }
+
   function normalizeAssetUrl(url) {
     if (!url) {
       return "";
@@ -551,6 +781,24 @@
       /\/(?:orj360|thumb150|thumb180|mw690|bmiddle|small|square|wap360|large)\//i,
       "/large/"
     );
+  }
+
+  function normalizeXAssetUrl(url) {
+    const normalizedUrl = normalizeAssetUrl(url);
+    if (!normalizedUrl) {
+      return "";
+    }
+
+    try {
+      const parsed = new URL(normalizedUrl);
+      if (parsed.hostname === "pbs.twimg.com") {
+        parsed.searchParams.set("name", "large");
+      }
+
+      return parsed.href;
+    } catch (_error) {
+      return normalizedUrl;
+    }
   }
 
   function extractImageUrl(img) {
